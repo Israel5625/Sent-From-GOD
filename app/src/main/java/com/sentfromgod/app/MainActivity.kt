@@ -30,44 +30,56 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+
 @Composable
 fun SentFromGodApp() {
-    var tab by remember { mutableIntStateOf(0) }
-    var balance by remember { mutableDoubleStateOf(0.0) }
+    var signedIn by remember { mutableStateOf(false) }
 
-    MaterialTheme {
-        Scaffold(
-            containerColor = Background,
-            bottomBar = {
-                NavigationBar {
-                    listOf("Home", "Earn", "Wallet", "Profile")
-                        .forEachIndexed { index, name ->
-                            NavigationBarItem(
-                                selected = tab == index,
-                                onClick = { tab = index },
-                                icon = {
-                                    Text(
-                                        listOf("⌂", "▶", "£", "●")[index],
-                                        fontSize = 20.sp
-                                    )
-                                },
-                                label = { Text(name) }
-                            )
-                        }
-                }
+    if (!signedIn) {
+        AuthScreen(
+            onSignedIn = {
+                signedIn = true
             }
-        ) { padding ->
-            when (tab) {
-                0 -> HomeScreen(balance, padding) { tab = 1 }
-                1 -> EarnScreen(padding) { amount ->
-                    balance += amount
+        )
+    } else {
+        var tab by remember { mutableIntStateOf(0) }
+        var balance by remember { mutableDoubleStateOf(0.0) }
+
+        MaterialTheme {
+            Scaffold(
+                containerColor = Background,
+                bottomBar = {
+                    NavigationBar {
+                        listOf("Home", "Earn", "Wallet", "Profile")
+                            .forEachIndexed { index, name ->
+                                NavigationBarItem(
+                                    selected = tab == index,
+                                    onClick = { tab = index },
+                                    icon = {
+                                        Text(
+                                            listOf("⌂", "▶", "£", "●")[index],
+                                            fontSize = 20.sp
+                                        )
+                                    },
+                                    label = { Text(name) }
+                                )
+                            }
+                    }
                 }
-                2 -> WalletScreen(balance, padding)
-                else -> ProfileScreen(padding)
+            ) { padding ->
+                when (tab) {
+                    0 -> HomeScreen(balance, padding) { tab = 1 }
+                    1 -> EarnScreen(padding) { amount ->
+                        balance += amount
+                    }
+                    2 -> WalletScreen(balance, padding)
+                    else -> ProfileScreen(padding)
+                }
             }
         }
     }
 }
+
 
 @Composable
 fun BrandHeader() {
