@@ -7,7 +7,7 @@ plugins {
 }
 android {
     namespace = "com.sentfromgod.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.sentfromgod.app"
