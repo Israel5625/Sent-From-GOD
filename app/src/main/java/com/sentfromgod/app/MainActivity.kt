@@ -1,10 +1,11 @@
 
 package com.sentfromgod.app
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,15 +14,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val Purple = Color(0xFF6941C6)
-private val Navy = Color(0xFF171735)
-private val Background = Color(0xFFF7F6FC)
-private val Green = Color(0xFF16865B)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,318 +26,379 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private val Purple = androidx.compose.ui.graphics.Color(0xFF6941C6)
 
 @Composable
 fun SentFromGodApp() {
     var signedIn by remember { mutableStateOf(false) }
+    var darkMode by remember { mutableStateOf(false) }
 
-    if (!signedIn) {
-        AuthScreen(
-            onSignedIn = {
-                signedIn = true
-            }
-        )
-    } else {
-        var tab by remember { mutableIntStateOf(0) }
-        var balance by remember { mutableDoubleStateOf(0.0) }
+    val colors = if (darkMode) darkColorScheme() else lightColorScheme(
+        primary = Purple
+    )
 
-        MaterialTheme {
-            Scaffold(
-                containerColor = Background,
-                bottomBar = {
-                    NavigationBar {
-                        listOf("Home", "Earn", "Wallet", "Profile")
-                            .forEachIndexed { index, name ->
-                                NavigationBarItem(
-                                    selected = tab == index,
-                                    onClick = { tab = index },
-                                    icon = {
-                                        Text(
-                                            listOf("⌂", "▶", "£", "●")[index],
-                                            fontSize = 20.sp
-                                        )
-                                    },
-                                    label = { Text(name) }
-                                )
-                            }
-                    }
-                }
-            ) { padding ->
-                when (tab) {
-                    0 -> HomeScreen(balance, padding) { tab = 1 }
-                    1 -> EarnScreen(padding) { amount ->
-                        balance += amount
-                    }
-                    2 -> WalletScreen(balance, padding)
-                    else -> ProfileScreen(padding)
-                }
-            }
-        }
-    }
-}
-
-
-@Composable
-fun BrandHeader() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(54.dp)
-                .background(Purple, RoundedCornerShape(17.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("SFG", color = Color.White, fontWeight = FontWeight.Black)
-        }
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(
-                "Sent From GOD",
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold,
-                color = Navy
-            )
-            Text(
-                "Play • Watch • Listen • Earn",
-                color = Color.Gray,
-                fontSize = 12.sp
+    MaterialTheme(colorScheme = colors) {
+        if (!signedIn) {
+            AuthScreen(onSignedIn = { signedIn = true })
+        } else {
+            AppPages(
+                darkMode = darkMode,
+                onDarkMode = { darkMode = it },
+                onSignOut = { signedIn = false }
             )
         }
     }
 }
 
 @Composable
-fun HomeScreen(
-    balance: Double,
-    padding: PaddingValues,
-    onEarn: () -> Unit
+private fun AppPages(
+    darkMode: Boolean,
+    onDarkMode: (Boolean) -> Unit,
+    onSignOut: () -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(bottom = 24.dp)
-    ) {
-        item { BrandHeader() }
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Navy)
-            ) {
-                Column(Modifier.padding(22.dp)) {
-                    Text("Your demo balance", color = Color.LightGray)
+    var page by remember { mutableStateOf("Home") }
+    var balance by remember { mutableDoubleStateOf(0.0) }
+    val history = remember { mutableStateListOf<String>() }
+    val context = LocalContext.current
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                listOf("Home", "Earn", "Wallet", "Profile").forEach { item ->
+                    NavigationBarItem(
+                        selected = page == item,
+                        onClick = { page = item },
+                        icon = {
+                            Text(
+                                when (item) {
+                                    "Home" -> "⌂"
+                                    "Earn" -> "▶"
+                                    "Wallet" -> "£"
+                                    else -> "●"
+                                },
+                                fontSize = 20.sp
+                            )
+                        },
+                        label = { Text(item) }
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            when (page) {
+                "Home" -> {
+                    PageTitle("Sent From GOD")
                     Text(
-                        "£${"%.2f".format(balance)}",
-                        color = Color.White,
-                        fontSize = 34.sp,
+                        "Play • Watch • Listen • Earn",
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Column(Modifier.padding(20.dp)) {
+                            Text("Your demo balance")
+                            Text(
+                                "£%.2f".format(balance),
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text("Demo balance only — not withdrawable cash.")
+                            Button(onClick = { page = "Earn" }) {
+                                Text("Explore rewards")
+                            }
+                        }
+                    }
+                    MenuRow("My profile") { page = "My profile" }
+                    MenuRow("Settings") { page = "Settings" }
+                }
+
+                "Earn" -> {
+                    PageTitle("Earn rewards")
+                    Text(
+                        "These sample tasks add demo amounts only.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    listOf(
+                        "Game demo" to 0.50,
+                        "Video demo" to 0.10,
+                        "Music demo" to 0.05,
+                        "Daily bonus demo" to 0.20
+                    ).forEach { (name, amount) ->
+                        MenuRow("$name  +£%.2f".format(amount)) {
+                            balance += amount
+                            history.add(
+                                "$name — +£%.2f (demo)".format(amount)
+                            )
+                            page = "Earnings history"
+                        }
+                    }
+                }
+
+                "Wallet" -> {
+                    PageTitle("My Wallet")
+                    Text(
+                        "Demo balance: £%.2f".format(balance),
+                        modifier = Modifier.padding(20.dp),
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(Modifier.height(14.dp))
+                    MenuRow("Earnings history") {
+                        page = "Earnings history"
+                    }
+                    MenuRow("Payment details") {
+                        page = "Payment details"
+                    }
                     Text(
-                        "Earn up to £20/day when eligible offers are available.",
-                        color = Color.White,
-                        fontSize = 13.sp
+                        "Withdrawals are not connected.",
+                        modifier = Modifier.padding(20.dp)
                     )
-                    Spacer(Modifier.height(14.dp))
-                    Button(
-                        onClick = onEarn,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Purple
-                        )
-                    ) {
-                        Text("Explore rewards")
+                }
+
+                "Profile" -> {
+                    PageTitle("My Profile")
+                    listOf(
+                        "My profile",
+                        "Settings",
+                        "Payment details",
+                        "Earnings history",
+                        "Invite friends",
+                        "Help & support",
+                        "Terms & privacy"
+                    ).forEach { option ->
+                        MenuRow(option) { page = option }
                     }
                 }
+
+                "My profile" -> {
+                    PageTitle("My Profile")
+                    Text(
+                        "Your account is signed in.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    Text(
+                        "Email: use the email you registered with.",
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    Text(
+                        "Profile names and details are not yet saved to the database.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    MenuRow("Settings") { page = "Settings" }
+                    MenuRow("Back to Profile") { page = "Profile" }
+                }
+
+                "Settings" -> {
+                    PageTitle("Settings")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Dark mode", Modifier.weight(1f))
+                        Switch(
+                            checked = darkMode,
+                            onCheckedChange = onDarkMode
+                        )
+                    }
+                    MenuRow("Help & support") {
+                        page = "Help & support"
+                    }
+                    MenuRow("Terms & privacy") {
+                        page = "Terms & privacy"
+                    }
+                    MenuRow("Sign out") { onSignOut() }
+                }
+
+                "Payment details" -> {
+                    var accountName by remember { mutableStateOf("") }
+                    var paymentMethod by remember { mutableStateOf("") }
+                    var accountReference by remember { mutableStateOf("") }
+                    var message by remember { mutableStateOf("") }
+
+                    PageTitle("Payment details")
+                    Text(
+                        "Demo form. Details are not yet saved to Supabase.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    OutlinedTextField(
+                        value = accountName,
+                        onValueChange = { accountName = it },
+                        label = { Text("Account holder name") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    )
+                    OutlinedTextField(
+                        value = paymentMethod,
+                        onValueChange = { paymentMethod = it },
+                        label = { Text("Payment method") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    )
+                    OutlinedTextField(
+                        value = accountReference,
+                        onValueChange = { accountReference = it },
+                        label = { Text("Account reference") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    )
+                    Button(
+                        onClick = {
+                            message =
+                                "Not saved yet. Database connection is still needed."
+                        },
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text("Save details")
+                    }
+                    Text(message, modifier = Modifier.padding(16.dp))
+                }
+
+                "Earnings history" -> {
+                    PageTitle("Earnings history")
+                    Text(
+                        "Demo activity for this app session.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    if (history.isEmpty()) {
+                        Text(
+                            "No demo earnings yet.",
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        history.reversed().forEach { entry ->
+                            MenuRow(entry) {}
+                        }
+                    }
+                    Text(
+                        "History is not yet stored permanently.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+
+                "Invite friends" -> {
+                    PageTitle("Invite friends")
+                    Text(
+                        "Share Sent From GOD with your friends.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    Button(
+                        onClick = {
+                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(
+                                    Intent.EXTRA_TEXT,
+                                    "Join me on Sent From GOD! " +
+                                        "Ask me for the app link."
+                                )
+                            }
+                            context.startActivity(
+                                Intent.createChooser(
+                                    sendIntent,
+                                    "Invite friends"
+                                )
+                            )
+                        },
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text("Share invitation")
+                    }
+                    Text(
+                        "A referral link and referral tracking still need to be configured.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+
+                "Help & support" -> {
+                    PageTitle("Help & support")
+                    Text(
+                        "Need help with your account? Contact support by email.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    Button(
+                        onClick = {
+                            val intent = Intent(
+                                Intent.ACTION_SENDTO,
+                                Uri.parse("mailto:support@example.com")
+                            ).apply {
+                                putExtra(
+                                    Intent.EXTRA_SUBJECT,
+                                    "Sent From GOD support"
+                                )
+                            }
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text("Email support")
+                    }
+                    Text(
+                        "The support email must be replaced with your real support address.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+
+                "Terms & privacy" -> {
+                    PageTitle("Terms & Privacy")
+                    Text(
+                        "Sent From GOD demo app",
+                        modifier = Modifier.padding(16.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Demo balances are not real money and cannot be withdrawn. " +
+                            "No earnings are guaranteed. Payment details and profile " +
+                            "information must not be considered saved until the " +
+                            "secure database connection is implemented. Do not enter " +
+                            "bank passwords, card PINs, or other secret credentials.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    Text(
+                        "A complete published privacy policy and terms of service " +
+                            "must be provided before public launch.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
             }
-        }
-        item { Heading("Discover ways to earn") }
-        item { RewardCard("🎮", "Play games", "Explore game offers") }
-        item { RewardCard("▶", "Watch videos", "Discover sponsored videos") }
-        item { RewardCard("♫", "Music", "Explore music campaigns") }
-        item { RewardCard("🎁", "Daily bonus", "Check available bonuses") }
-        item {
-            Text(
-                "Rewards depend on eligible campaigns. Demo balances are not cash.",
-                modifier = Modifier.padding(20.dp),
-                color = Color.Gray,
-                fontSize = 12.sp
-            )
         }
     }
 }
 
 @Composable
-fun Heading(text: String) {
+private fun PageTitle(title: String) {
     Text(
-        text,
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-        fontWeight = FontWeight.Bold,
-        color = Navy,
-        fontSize = 19.sp
+        title,
+        modifier = Modifier.padding(20.dp),
+        fontSize = 26.sp,
+        fontWeight = FontWeight.Bold
     )
 }
 
 @Composable
-fun RewardCard(icon: String, title: String, description: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(18.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(17.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(icon, fontSize = 28.sp)
-            Spacer(Modifier.width(14.dp))
-            Column {
-                Text(title, fontWeight = FontWeight.Bold, color = Navy)
-                Text(description, color = Color.Gray, fontSize = 12.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun EarnScreen(
-    padding: PaddingValues,
-    onDemoReward: (Double) -> Unit
+private fun MenuRow(
+    title: String,
+    onClick: () -> Unit
 ) {
-    var message by remember { mutableStateOf("") }
-
-    Column(
-        modifier = Modifier.fillMaxSize().padding(padding)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 5.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp)
     ) {
         Text(
-            "Earn rewards",
-            modifier = Modifier.padding(20.dp),
-            fontSize = 27.sp,
-            fontWeight = FontWeight.Bold,
-            color = Navy
+            title,
+            modifier = Modifier.padding(18.dp)
         )
-        Text(
-            "Try the demo reward buttons below. They do not pay real money.",
-            modifier = Modifier.padding(horizontal = 20.dp),
-            color = Color.Gray,
-            fontSize = 13.sp
-        )
-
-        listOf(
-            Triple("🎮", "Game task", 0.50),
-            Triple("▶", "Video demo", 0.10),
-            Triple("♫", "Music demo", 0.05),
-            Triple("🎁", "Daily bonus demo", 0.20)
-        ).forEach { item ->
-            Card(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 7.dp)
-                    .clickable {
-                        onDemoReward(item.third)
-                        message = "Demo balance updated by £%.2f"
-                            .format(item.third)
-                    },
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(item.first, fontSize = 25.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(item.second, Modifier.weight(1f), color = Navy)
-                    Text(
-                        "+£%.2f".format(item.third),
-                        color = Green,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        if (message.isNotEmpty()) {
-            Text(
-                message,
-                modifier = Modifier.padding(20.dp),
-                color = Green
-            )
-        }
-    }
-}
-
-@Composable
-fun WalletScreen(balance: Double, padding: PaddingValues) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp)
-    ) {
-        Text(
-            "My Wallet",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Navy
-        )
-        Spacer(Modifier.height(18.dp))
-        Card(shape = RoundedCornerShape(22.dp)) {
-            Column(Modifier.padding(22.dp)) {
-                Text("Demo balance", color = Color.Gray)
-                Text(
-                    "£${"%.2f".format(balance)}",
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Navy
-                )
-                Spacer(Modifier.height(18.dp))
-                Button(
-                    onClick = {},
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = false
-                ) {
-                    Text("Withdrawals not connected yet")
-                }
-                Text(
-                    "Real withdrawals require a verified account, backend, " +
-                        "and payment provider.",
-                    color = Color.Gray,
-                    fontSize = 12.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ProfileScreen(padding: PaddingValues) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp)
-    ) {
-        Text(
-            "My Profile",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Navy
-        )
-        Spacer(Modifier.height(16.dp))
-        listOf(
-            "Account settings",
-            "Payment details",
-            "Earnings history",
-            "Invite friends",
-            "Help & support",
-            "Terms & privacy"
-        ).forEach { option ->
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Text(
-                    option,
-                    modifier = Modifier.padding(17.dp),
-                    color = Navy
-                )
-            }
-        }
     }
 }
