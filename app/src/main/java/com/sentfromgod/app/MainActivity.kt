@@ -6,9 +6,12 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,24 +21,78 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import io.github.jan.supabase.auth.auth
+import kotlinx.coroutines.launch
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { SentFromGodApp() }
+        setContent {
+            SentFromGodApp(
+                onFingerprint = { onResult ->
+                    val manager = BiometricManager.from(this)
+                    val authenticators =
+                        BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                            BiometricManager.Authenticators.BIOMETRIC_WEAK
+
+                    if (manager.canAuthenticate(authenticators) !=
+                        BiometricManager.BIOMETRIC_SUCCESS
+                    ) {
+                        onResult(false, "Set up fingerprint or biometrics in your phone settings first.")
+                    } else {
+                        val executor = ContextCompat.getMainExecutor(this)
+                        val prompt = BiometricPrompt(
+                            this,
+                            executor,
+                            object : BiometricPrompt.AuthenticationCallback() {
+                                override fun onAuthenticationSucceeded(
+                                    result: BiometricPrompt.AuthenticationResult
+                                ) {
+                                    onResult(true, "Fingerprint verified.")
+                                }
+
+                                override fun onAuthenticationFailed() {
+                                    onResult(false, "Fingerprint not recognised. Try again.")
+                                }
+
+                                override fun onAuthenticationError(
+                                    errorCode: Int,
+                                    errString: CharSequence
+                                ) {
+                                    onResult(false, errString.toString())
+                                }
+                            }
+                        )
+
+                        val info = BiometricPrompt.PromptInfo.Builder()
+                            .setTitle("Sent From GOD")
+                            .setSubtitle("Verify your identity")
+                            .setAllowedAuthenticators(authenticators)
+                            .setNegativeButtonText("Cancel")
+                            .build()
+
+                        prompt.authenticate(info)
+                    }
+                }
+            )
+        }
     }
 }
 
 private val Purple = androidx.compose.ui.graphics.Color(0xFF6941C6)
 
 @Composable
-fun SentFromGodApp() {
+fun SentFromGodApp(
+    onFingerprint: ((Boolean, String) -> Unit) -> Unit
+) {
     var signedIn by remember { mutableStateOf(false) }
     var darkMode by remember { mutableStateOf(false) }
+    var biometricMessage by remember { mutableStateOf("") }
 
-    val colors = if (darkMode) darkColorScheme() else lightColorScheme(
-        primary = Purple
-    )
+    val colors = if (darkMode) darkColorScheme()
+    else lightColorScheme(primary = Purple)
 
     MaterialTheme(colorScheme = colors) {
         if (!signedIn) {
@@ -44,7 +101,16 @@ fun SentFromGodApp() {
             AppPages(
                 darkMode = darkMode,
                 onDarkMode = { darkMode = it },
-                onSignOut = { signedIn = false }
+                onSignOut = {
+                    signedIn = false
+                    biometricMessage = ""
+                },
+                onFingerprint = {
+                    onFingerprint { success, message ->
+                        biometricMessage = message
+                    }
+                },
+                biometricMessage = biometricMessage
             )
         }
     }
@@ -54,12 +120,20 @@ fun SentFromGodApp() {
 private fun AppPages(
     darkMode: Boolean,
     onDarkMode: (Boolean) -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onFingerprint: () -> Unit,
+    biometricMessage: String
 ) {
     var page by remember { mutableStateOf("Home") }
     var balance by remember { mutableDoubleStateOf(0.0) }
     val history = remember { mutableStateListOf<String>() }
+    var accountName by remember { mutableStateOf("") }
+    var paymentMethod by remember { mutableStateOf("") }
+    var accountReference by remember { mutableStateOf("") }
+    var withdrawalAmount by remember { mutableStateOf("5.00") }
+    var withdrawalMessage by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         bottomBar = {
@@ -89,6 +163,7 @@ private fun AppPages(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
         ) {
             when (page) {
                 "Home" -> {
@@ -102,14 +177,17 @@ private fun AppPages(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        Column(Modifier.padding(20.dp)) {
+                        Column(
+                            Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             Text("Your demo balance")
                             Text(
-                                "£%.2f".format(balance),
+                                formatGBP(balance),
                                 fontSize = 32.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text("Demo balance only — not withdrawable cash.")
+                            Text("Demo only. This is not real or withdrawable money.")
                             Button(onClick = { page = "Earn" }) {
                                 Text("Explore rewards")
                             }
@@ -131,20 +209,24 @@ private fun AppPages(
                         "Music demo" to 0.05,
                         "Daily bonus demo" to 0.20
                     ).forEach { (name, amount) ->
-                        MenuRow("$name  +£%.2f".format(amount)) {
+                        MenuRow("$name  +${formatGBP(amount)}") {
                             balance += amount
                             history.add(
-                                "$name — +£%.2f (demo)".format(amount)
+                                "$name — +${formatGBP(amount)} (demo)"
                             )
                             page = "Earnings history"
                         }
                     }
+                    Text(
+                        "Real reward providers have not been connected.",
+                        modifier = Modifier.padding(16.dp)
+                    )
                 }
 
                 "Wallet" -> {
                     PageTitle("My Wallet")
                     Text(
-                        "Demo balance: £%.2f".format(balance),
+                        "Demo balance: ${formatGBP(balance)}",
                         modifier = Modifier.padding(20.dp),
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
@@ -155,8 +237,11 @@ private fun AppPages(
                     MenuRow("Payment details") {
                         page = "Payment details"
                     }
+                    MenuRow("Request withdrawal") {
+                        page = "Withdraw"
+                    }
                     Text(
-                        "Withdrawals are not connected.",
+                        "Real withdrawals are not connected.",
                         modifier = Modifier.padding(20.dp)
                     )
                 }
@@ -179,18 +264,13 @@ private fun AppPages(
                 "My profile" -> {
                     PageTitle("My Profile")
                     Text(
-                        "Your account is signed in.",
+                        "You are signed in for this app session.",
                         modifier = Modifier.padding(16.dp)
                     )
                     Text(
-                        "Email: use the email you registered with.",
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                    Text(
-                        "Profile names and details are not yet saved to the database.",
+                        "Profile details are not yet saved to the database.",
                         modifier = Modifier.padding(16.dp)
                     )
-                    MenuRow("Settings") { page = "Settings" }
                     MenuRow("Back to Profile") { page = "Profile" }
                 }
 
@@ -208,30 +288,43 @@ private fun AppPages(
                             onCheckedChange = onDarkMode
                         )
                     }
+                    MenuRow("Fingerprint verification") {
+                        onFingerprint()
+                    }
+                    if (biometricMessage.isNotBlank()) {
+                        Text(
+                            biometricMessage,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                     MenuRow("Help & support") {
                         page = "Help & support"
                     }
                     MenuRow("Terms & privacy") {
                         page = "Terms & privacy"
                     }
-                    MenuRow("Sign out") { onSignOut() }
+                    MenuRow("Sign out") {
+                        scope.launch {
+                            try {
+                                SupabaseClient.client.auth.signOut()
+                            } finally {
+                                onSignOut()
+                            }
+                        }
+                    }
                 }
 
                 "Payment details" -> {
-                    var accountName by remember { mutableStateOf("") }
-                    var paymentMethod by remember { mutableStateOf("") }
-                    var accountReference by remember { mutableStateOf("") }
-                    var message by remember { mutableStateOf("") }
-
                     PageTitle("Payment details")
                     Text(
-                        "Demo form. Details are not yet saved to Supabase.",
+                        "Enter your payout details. This form does not save them yet.",
                         modifier = Modifier.padding(16.dp)
                     )
                     OutlinedTextField(
                         value = accountName,
                         onValueChange = { accountName = it },
                         label = { Text("Account holder name") },
+                        singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
@@ -240,6 +333,7 @@ private fun AppPages(
                         value = paymentMethod,
                         onValueChange = { paymentMethod = it },
                         label = { Text("Payment method") },
+                        singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp)
@@ -248,26 +342,68 @@ private fun AppPages(
                         value = accountReference,
                         onValueChange = { accountReference = it },
                         label = { Text("Account reference") },
+                        singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
                     )
+                    Text(
+                        "Never enter your bank password, card PIN or CVV.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    Text(
+                        "Saving payment details is not connected yet.",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+
+                "Withdraw" -> {
+                    PageTitle("Request withdrawal")
+                    Text(
+                        "Minimum request: £5.00",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    Text(
+                        "Your current balance is demo money and cannot be withdrawn.",
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    OutlinedTextField(
+                        value = withdrawalAmount,
+                        onValueChange = { withdrawalAmount = it },
+                        label = { Text("Amount in GBP (£)") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    )
                     Button(
                         onClick = {
-                            message =
-                                "Not saved yet. Database connection is still needed."
+                            val amount = withdrawalAmount.toDoubleOrNull()
+                            withdrawalMessage = when {
+                                amount == null || !amount.isFinite() ->
+                                    "Enter a valid amount."
+                                amount < 5.0 ->
+                                    "The minimum request is £5.00."
+                                else ->
+                                    "Not submitted. Real earnings, secure balance checks and payout processing are not connected."
+                            }
                         },
                         modifier = Modifier.padding(16.dp)
                     ) {
-                        Text("Save details")
+                        Text("Check request")
                     }
-                    Text(message, modifier = Modifier.padding(16.dp))
+                    if (withdrawalMessage.isNotBlank()) {
+                        Text(
+                            withdrawalMessage,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                 }
 
                 "Earnings history" -> {
                     PageTitle("Earnings history")
                     Text(
-                        "Demo activity for this app session.",
+                        "Demo activity for this app session only.",
                         modifier = Modifier.padding(16.dp)
                     )
                     if (history.isEmpty()) {
@@ -281,7 +417,7 @@ private fun AppPages(
                         }
                     }
                     Text(
-                        "History is not yet stored permanently.",
+                        "History is not permanently stored.",
                         modifier = Modifier.padding(16.dp)
                     )
                 }
@@ -298,15 +434,11 @@ private fun AppPages(
                                 type = "text/plain"
                                 putExtra(
                                     Intent.EXTRA_TEXT,
-                                    "Join me on Sent From GOD! " +
-                                        "Ask me for the app link."
+                                    "Join me on Sent From GOD! Ask me for the app link."
                                 )
                             }
                             context.startActivity(
-                                Intent.createChooser(
-                                    sendIntent,
-                                    "Invite friends"
-                                )
+                                Intent.createChooser(sendIntent, "Invite friends")
                             )
                         },
                         modifier = Modifier.padding(16.dp)
@@ -314,7 +446,7 @@ private fun AppPages(
                         Text("Share invitation")
                     }
                     Text(
-                        "A referral link and referral tracking still need to be configured.",
+                        "Referral links and tracking are not configured yet.",
                         modifier = Modifier.padding(16.dp)
                     )
                 }
@@ -322,7 +454,7 @@ private fun AppPages(
                 "Help & support" -> {
                     PageTitle("Help & support")
                     Text(
-                        "Need help with your account? Contact support by email.",
+                        "Support email has not yet been configured.",
                         modifier = Modifier.padding(16.dp)
                     )
                     Button(
@@ -342,30 +474,15 @@ private fun AppPages(
                     ) {
                         Text("Email support")
                     }
-                    Text(
-                        "The support email must be replaced with your real support address.",
-                        modifier = Modifier.padding(16.dp)
-                    )
                 }
 
                 "Terms & privacy" -> {
                     PageTitle("Terms & Privacy")
                     Text(
-                        "Sent From GOD demo app",
-                        modifier = Modifier.padding(16.dp),
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
                         "Demo balances are not real money and cannot be withdrawn. " +
-                            "No earnings are guaranteed. Payment details and profile " +
-                            "information must not be considered saved until the " +
-                            "secure database connection is implemented. Do not enter " +
-                            "bank passwords, card PINs, or other secret credentials.",
-                        modifier = Modifier.padding(16.dp)
-                    )
-                    Text(
-                        "A complete published privacy policy and terms of service " +
-                            "must be provided before public launch.",
+                            "No earnings are guaranteed. Payment details are not saved " +
+                            "by this demo screen. A complete privacy policy and terms " +
+                            "of service are required before public launch.",
                         modifier = Modifier.padding(16.dp)
                     )
                 }
@@ -373,6 +490,9 @@ private fun AppPages(
         }
     }
 }
+
+private fun formatGBP(amount: Double): String =
+    String.format(Locale.UK, "£%.2f", amount)
 
 @Composable
 private fun PageTitle(title: String) {
