@@ -23,6 +23,7 @@ import androidx.fragment.app.FragmentActivity
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 import java.util.Locale
+import androidx.activity.compose.setContent
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
