@@ -38,5 +38,5 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:postgrest-kt:3.5.0")
     implementation("io.ktor:ktor-client-android:3.4.2")
     implementation("androidx.biometric:biometric:1.1.0")
-
+    implementation("androidx.fragment:fragment-ktx:1.8.9")
 }
