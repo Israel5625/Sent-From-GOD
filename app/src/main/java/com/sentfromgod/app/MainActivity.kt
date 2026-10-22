@@ -1,18 +1,15 @@
-
 package com.sentfromgod.app
 
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,13 +19,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             SentFromGodApp(
                 onFingerprint = { onResult ->
@@ -37,12 +36,17 @@ class MainActivity : ComponentActivity() {
                         BiometricManager.Authenticators.BIOMETRIC_STRONG or
                             BiometricManager.Authenticators.BIOMETRIC_WEAK
 
-                    if (manager.canAuthenticate(authenticators) !=
+                    if (
+                        manager.canAuthenticate(authenticators) !=
                         BiometricManager.BIOMETRIC_SUCCESS
                     ) {
-                        onResult(false, "Set up fingerprint or biometrics in your phone settings first.")
+                        onResult(
+                            false,
+                            "Set up fingerprint or biometrics in your phone settings first."
+                        )
                     } else {
                         val executor = ContextCompat.getMainExecutor(this)
+
                         val prompt = BiometricPrompt(
                             this,
                             executor,
@@ -54,7 +58,10 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 override fun onAuthenticationFailed() {
-                                    onResult(false, "Fingerprint not recognised. Try again.")
+                                    onResult(
+                                        false,
+                                        "Fingerprint not recognised. Try again."
+                                    )
                                 }
 
                                 override fun onAuthenticationError(
@@ -91,8 +98,11 @@ fun SentFromGodApp(
     var darkMode by remember { mutableStateOf(false) }
     var biometricMessage by remember { mutableStateOf("") }
 
-    val colors = if (darkMode) darkColorScheme()
-    else lightColorScheme(primary = Purple)
+    val colors = if (darkMode) {
+        darkColorScheme()
+    } else {
+        lightColorScheme(primary = Purple)
+    }
 
     MaterialTheme(colorScheme = colors) {
         if (!signedIn) {
@@ -132,6 +142,7 @@ private fun AppPages(
     var accountReference by remember { mutableStateOf("") }
     var withdrawalAmount by remember { mutableStateOf("5.00") }
     var withdrawalMessage by remember { mutableStateOf("") }
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -178,7 +189,7 @@ private fun AppPages(
                             .padding(16.dp)
                     ) {
                         Column(
-                            Modifier.padding(20.dp),
+                            modifier = Modifier.padding(20.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text("Your demo balance")
@@ -187,7 +198,9 @@ private fun AppPages(
                                 fontSize = 32.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text("Demo only. This is not real or withdrawable money.")
+                            Text(
+                                "Demo only. This is not real or withdrawable money."
+                            )
                             Button(onClick = { page = "Earn" }) {
                                 Text("Explore rewards")
                             }
@@ -211,9 +224,7 @@ private fun AppPages(
                     ).forEach { (name, amount) ->
                         MenuRow("$name  +${formatGBP(amount)}") {
                             balance += amount
-                            history.add(
-                                "$name — +${formatGBP(amount)} (demo)"
-                            )
+                            history.add("$name — +${formatGBP(amount)} (demo)")
                             page = "Earnings history"
                         }
                     }
